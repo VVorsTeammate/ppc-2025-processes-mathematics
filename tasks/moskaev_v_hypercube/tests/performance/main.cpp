@@ -60,8 +60,8 @@ TEST_P(MoskaevVHypercubePerfTests, HypercubePerformance) {
   ExecuteTest(GetParam());
 }
 
-const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, MoskaevVTestMPI, MoskaevVTestSEQ>(
-    PPC_SETTINGS_moskaev_v_hypercube);
+const auto kAllPerfTasks =
+    ppc::util::MakeAllPerfTasks<InType, MoskaevVTestMPI, MoskaevVTestSEQ>(PPC_SETTINGS_moskaev_v_hypercube);
 
 const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 
