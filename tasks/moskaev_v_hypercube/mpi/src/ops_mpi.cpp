@@ -55,6 +55,38 @@ int hypercubeSum(int local_value, int rank, int size) {
 
 }  // namespace
 
+namespace {
+void SyncResultToAllProcesses(HypercubeTestResult &result, int rank) {
+  struct SyncData {
+    int total_tests_passed;
+    int topology_verified;
+    int communication_ok;
+    int computation_ok;
+    int max_hops_required;
+  };
+
+  SyncData data;
+
+  if (rank == 0) {
+    data.total_tests_passed = result.total_tests_passed;
+    data.topology_verified = result.topology_verified ? 1 : 0;
+    data.communication_ok = result.communication_ok ? 1 : 0;
+    data.computation_ok = result.computation_ok ? 1 : 0;
+    data.max_hops_required = result.max_hops_required;
+  }
+
+  MPI_Bcast(&data, sizeof(SyncData), MPI_BYTE, 0, MPI_COMM_WORLD);
+
+  if (rank != 0) {
+    result.total_tests_passed = data.total_tests_passed;
+    result.topology_verified = data.topology_verified == 1;
+    result.communication_ok = data.communication_ok == 1;
+    result.computation_ok = data.computation_ok == 1;
+    result.max_hops_required = data.max_hops_required;
+  }
+}
+}  // namespace
+
 MoskaevVTestMPI::MoskaevVTestMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
@@ -120,7 +152,12 @@ bool MoskaevVTestMPI::RunImpl() {
   MPI_Bcast(&global_topology_ok, 1, MPI_INT, 0, MPI_COMM_WORLD);
   result.topology_verified = (global_topology_ok == 1);
 
+  if (rank != 0 && result.topology_verified) {
+    result.total_tests_passed++;
+  }
+
   if (!result.topology_verified) {
+    SyncResultToAllProcesses(result, rank);
     GetOutput() = result;
     return false;
   }
@@ -166,6 +203,12 @@ bool MoskaevVTestMPI::RunImpl() {
 
     MPI_Bcast(&global_comm_ok, 1, MPI_INT, 0, MPI_COMM_WORLD);
     result.communication_ok = (global_comm_ok == 1);
+    MPI_Bcast(&global_max_hops, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    result.max_hops_required = global_max_hops;
+
+    if (rank != 0 && result.communication_ok) {
+      result.total_tests_passed++;
+    }
   }
 
   if (GetInput().test_computation) {
@@ -200,9 +243,20 @@ bool MoskaevVTestMPI::RunImpl() {
       }
     }
 
-    int comp_ok = result.computation_ok ? 1 : 0;
+    int comp_ok = (rank == 0 && result.computation_ok) ? 1 : 0;
     MPI_Bcast(&comp_ok, 1, MPI_INT, 0, MPI_COMM_WORLD);
     result.computation_ok = (comp_ok == 1);
+
+    if (rank != 0 && result.computation_ok) {
+      result.total_tests_passed++;
+    }
+  }
+
+  int final_total_passed = result.total_tests_passed;
+  MPI_Bcast(&final_total_passed, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  if (rank != 0) {
+    result.total_tests_passed = final_total_passed;
   }
 
   GetOutput() = result;

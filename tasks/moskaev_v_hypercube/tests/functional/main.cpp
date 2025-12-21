@@ -16,29 +16,33 @@ class MoskaevVHypercubeFuncTests : public ppc::util::BaseRunFuncTests<InType, Ou
 
  protected:
   void SetUp() override {
-    int size = 0;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    auto params = GetParam();
 
-    bool is_power_of_two = (size > 0) && ((size & (size - 1)) == 0);
-    if (!is_power_of_two) {
-      GTEST_SKIP() << "Hypercube requires power-of-two processes, but " << size << " provided. Skipping test.";
-      return;
+    auto task_factory = std::get<0>(params);
+    auto test_name = std::get<1>(params);
+    auto test_data = std::get<2>(params);
+
+    input_data_ = std::get<0>(test_data);
+    std::string test_name_str = test_name;
+    bool is_mpi_test =
+        (test_name_str.find("mpi") != std::string::npos) || (test_name_str.find("MPI") != std::string::npos);
+
+    if (is_mpi_test) {
+      int size = 0;
+      MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+      if (!((size > 0) && ((size & (size - 1)) == 0))) {
+        GTEST_SKIP() << "Need power-of-two processes for hypercube, got " << size;
+      }
     }
+  }
 
-    TestType test_params = std::get<2>(GetParam());
-    input_data_ = std::get<0>(test_params);
+  InType GetTestInputData() final {
+    return input_data_;
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    if (rank != 0) {
-      return true;
-    }
-
-    // Проверяем, что прошли все ожидаемые тесты
-    int expected_tests = 1;  // Топология всегда проверяется
+    int expected_tests = 1;
     if (input_data_.test_communication) {
       expected_tests++;
     }
@@ -46,18 +50,7 @@ class MoskaevVHypercubeFuncTests : public ppc::util::BaseRunFuncTests<InType, Ou
       expected_tests++;
     }
 
-    if (output_data.total_tests_passed < expected_tests) {
-      std::cout << "FAIL: Only " << output_data.total_tests_passed << " tests passed, expected " << expected_tests
-                << std::endl;
-      return false;
-    }
-
-    std::cout << "PASS: " << output_data.total_tests_passed << " tests passed successfully" << std::endl;
-    return true;
-  }
-
-  InType GetTestInputData() final {
-    return input_data_;
+    return output_data.total_tests_passed >= expected_tests;
   }
 
  private:

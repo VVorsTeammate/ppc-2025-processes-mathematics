@@ -11,31 +11,37 @@ namespace moskaev_v_hypercube {
 class MoskaevVHypercubePerfTests : public ppc::util::BaseRunPerfTests<InType, OutType> {
  protected:
   void SetUp() override {
-    int size = 0;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    // Определяем, MPI ли это (так же как в functional/main.cpp)
+    auto params = GetParam();
+    auto test_name = std::get<1>(params);  // Имя теста
 
-    bool is_power_of_two = (size > 0) && ((size & (size - 1)) == 0);
-    if (!is_power_of_two) {
-      GTEST_SKIP() << "Hypercube requires power-of-two processes, but " << size << " provided. Skipping test.";
-      return;
+    bool is_mpi_test = (test_name.find("mpi") != std::string::npos) || (test_name.find("MPI") != std::string::npos);
+
+    if (is_mpi_test) {
+      // Только для MPI-тестов проверяем число процессов
+      int size = 0;
+      MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+      bool is_power_of_two = (size > 0) && ((size & (size - 1)) == 0);
+      if (!is_power_of_two) {
+        GTEST_SKIP() << "Hypercube requires power-of-two processes...";
+        return;
+      }
     }
 
     input_data_ = HypercubeTestData(1000, 12345, true, true);
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (rank == 0) {
-      if (!output_data.topology_verified) {
-        std::cerr << "Perf test failed: topology not verified" << std::endl;
-        return false;
-      }
-
-      std::cout << "Perf test completed: " << output_data.total_tests_passed << " tests passed" << std::endl;
+    int expected_tests = 1;  // Топология
+    if (input_data_.test_communication) {
+      expected_tests++;
+    }
+    if (input_data_.test_computation) {
+      expected_tests++;
     }
 
-    return true;
+    return output_data.total_tests_passed >= expected_tests;
   }
 
   InType GetTestInputData() final {

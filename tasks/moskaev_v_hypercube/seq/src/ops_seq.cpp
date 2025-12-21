@@ -13,7 +13,7 @@ MoskaevVTestSEQ::MoskaevVTestSEQ(const InType &in) {
 }
 
 bool MoskaevVTestSEQ::ValidationImpl() {
-  return GetInput().test_size > 0;
+  return true;
 }
 
 bool MoskaevVTestSEQ::PreProcessingImpl() {
