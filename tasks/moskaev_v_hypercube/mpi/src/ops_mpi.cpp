@@ -22,22 +22,6 @@ int calculateHops(int src, int dest) {
   return hops;
 }
 
-void getHypercubeNeighbors(int rank, int size, int neighbors[], int &count) {
-  count = 0;
-
-  int dims = 0;
-  while ((1 << dims) < size) {
-    dims++;
-  }
-
-  for (int d = 0; d < dims; d++) {
-    int neighbor = rank ^ (1 << d);
-    if (neighbor < size) {
-      neighbors[count++] = neighbor;
-    }
-  }
-}
-
 int hypercubeSum(int local_value, int rank, int size) {
   int result = local_value;
   int dims = 0;
