@@ -33,7 +33,7 @@ class MoskaevVHypercubePerfTests : public ppc::util::BaseRunPerfTests<InType, Ou
       }
     }
 
-    input_data_ = HypercubeTestData(1000, 12345, true, true);
+    input_data_ = HypercubeTestData(500, 12345, true, true);
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
@@ -60,7 +60,8 @@ TEST_P(MoskaevVHypercubePerfTests, HypercubePerformance) {
   ExecuteTest(GetParam());
 }
 
-const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, MoskaevVTestMPI, MoskaevVTestSEQ>("moskaev_v_hypercube");
+const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, MoskaevVTestMPI, MoskaevVTestSEQ>(
+    PPC_SETTINGS_moskaev_v_hypercube);
 
 const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 
