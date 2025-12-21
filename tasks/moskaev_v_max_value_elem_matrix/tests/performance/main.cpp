@@ -68,5 +68,5 @@ const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 const auto kPerfTestName = MoskaevVMaxValueElemMatrixPerfTests::CustomPerfTestName;
 
 INSTANTIATE_TEST_SUITE_P(PerfTests, MoskaevVMaxValueElemMatrixPerfTests, kGtestValues, kPerfTestName);
- 
+
 }  // namespace moskaev_v_max_value_elem_matrix
