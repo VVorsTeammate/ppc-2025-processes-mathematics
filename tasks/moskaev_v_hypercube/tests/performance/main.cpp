@@ -11,16 +11,20 @@ namespace moskaev_v_hypercube {
 class MoskaevVHypercubePerfTests : public ppc::util::BaseRunPerfTests<InType, OutType> {
  protected:
   void SetUp() override {
-    // Определяем, MPI ли это (так же как в functional/main.cpp)
     auto params = GetParam();
-    auto test_name = std::get<1>(params);  // Имя теста
+    auto test_name = std::get<1>(params);
 
     bool is_mpi_test = (test_name.find("mpi") != std::string::npos) || (test_name.find("MPI") != std::string::npos);
 
     if (is_mpi_test) {
-      // Только для MPI-тестов проверяем число процессов
       int size = 0;
       MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+      if (size < 2) {
+        GTEST_SKIP() << "Hypercube test requires at least 2 MPI processes. "
+                     << "Got " << size << " process. Skipping.";
+        return;
+      }
 
       bool is_power_of_two = (size > 0) && ((size & (size - 1)) == 0);
       if (!is_power_of_two) {
@@ -33,7 +37,7 @@ class MoskaevVHypercubePerfTests : public ppc::util::BaseRunPerfTests<InType, Ou
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
-    int expected_tests = 1;  // Топология
+    int expected_tests = 1;
     if (input_data_.test_communication) {
       expected_tests++;
     }

@@ -31,6 +31,12 @@ class MoskaevVHypercubeFuncTests : public ppc::util::BaseRunFuncTests<InType, Ou
       int size = 0;
       MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+      if (size < 2) {
+        GTEST_SKIP() << "Hypercube test requires at least 2 MPI processes. "
+                     << "Got " << size << " process. Skipping.";
+        return;
+      }
+
       if (!((size > 0) && ((size & (size - 1)) == 0))) {
         GTEST_SKIP() << "Need power-of-two processes for hypercube, got " << size;
       }
