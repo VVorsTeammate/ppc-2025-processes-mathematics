@@ -31,7 +31,7 @@ static InType GeneratePerfTestMatrix(int size) {
 }
 
 class MoskaevVMaxValueElemMatrixPerfTests : public ppc::util::BaseRunPerfTests<InType, OutType> {
-  const int kMatrixSize_ = 5000;
+  const int kMatrixSize_ = 10000;
   InType input_data_;
 
   void SetUp() override {
@@ -39,7 +39,15 @@ class MoskaevVMaxValueElemMatrixPerfTests : public ppc::util::BaseRunPerfTests<I
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
-    return output_data > 0;
+    const auto &matrix = input_data_;
+
+    int max_element = matrix[0][0];
+    for (const auto &row : matrix) {
+      for (int element : row) {
+        max_element = std::max(element, max_element);
+      }
+    }
+    return output_data == max_element;
   }
 
   InType GetTestInputData() final {
@@ -60,97 +68,5 @@ const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 const auto kPerfTestName = MoskaevVMaxValueElemMatrixPerfTests::CustomPerfTestName;
 
 INSTANTIATE_TEST_SUITE_P(PerfTests, MoskaevVMaxValueElemMatrixPerfTests, kGtestValues, kPerfTestName);
-
-TEST(MoskaevVMaxValueElemMatrixMpi, TestPipelineRun) {
-  int initialized = 0;
-  MPI_Initialized(&initialized);
-  if (initialized == 0) {
-    MPI_Init(nullptr, nullptr);
-  }
-  int rank = 0;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-  auto matrix = GeneratePerfTestMatrix(5000);
-  MoskaevVMaxValueElemMatrixMPI task(matrix);
-
-  EXPECT_TRUE(task.Validation());
-  EXPECT_TRUE(task.PreProcessing());
-
-  auto start_time = std::chrono::high_resolution_clock::now();
-  EXPECT_TRUE(task.Run());
-  auto end_time = std::chrono::high_resolution_clock::now();
-
-  EXPECT_TRUE(task.PostProcessing());
-  EXPECT_GT(task.GetOutput(), 0);
-
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-
-  if (rank == 0) {
-    std::cout << "MPI Pipeline time: " << duration.count() << "ms\n";
-  }
-}
-
-TEST(MoskaevVMaxValueElemMatrixMpi, TestTaskRun) {
-  int initialized = 0;
-  MPI_Initialized(&initialized);
-  if (initialized == 0) {
-    MPI_Init(nullptr, nullptr);
-  }
-  int rank = 0;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-  auto matrix = GeneratePerfTestMatrix(5000);
-  MoskaevVMaxValueElemMatrixMPI task(matrix);
-
-  auto start_time = std::chrono::high_resolution_clock::now();
-  EXPECT_TRUE(task.Validation());
-  EXPECT_TRUE(task.PreProcessing());
-  EXPECT_TRUE(task.Run());
-  EXPECT_TRUE(task.PostProcessing());
-  auto end_time = std::chrono::high_resolution_clock::now();
-
-  EXPECT_GT(task.GetOutput(), 0);
-
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-
-  if (rank == 0) {
-    std::cout << "MPI Task time: " << duration.count() << "ms\n";
-  }
-}
-
-TEST(MoskaevVMaxValueElemMatrixSeq, TestPipelineRun) {
-  auto matrix = GeneratePerfTestMatrix(5000);
-  MoskaevVMaxValueElemMatrixSEQ task(matrix);
-
-  EXPECT_TRUE(task.Validation());
-  EXPECT_TRUE(task.PreProcessing());
-
-  auto start_time = std::chrono::high_resolution_clock::now();
-  EXPECT_TRUE(task.Run());
-  auto end_time = std::chrono::high_resolution_clock::now();
-
-  EXPECT_TRUE(task.PostProcessing());
-  EXPECT_GT(task.GetOutput(), 0);
-
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-  std::cout << "SEQ Pipeline time: " << duration.count() << "ms\n";
-}
-
-TEST(MoskaevVMaxValueElemMatrixSeq, TestTaskRun) {
-  auto matrix = GeneratePerfTestMatrix(5000);
-  MoskaevVMaxValueElemMatrixSEQ task(matrix);
-
-  auto start_time = std::chrono::high_resolution_clock::now();
-  EXPECT_TRUE(task.Validation());
-  EXPECT_TRUE(task.PreProcessing());
-  EXPECT_TRUE(task.Run());
-  EXPECT_TRUE(task.PostProcessing());
-  auto end_time = std::chrono::high_resolution_clock::now();
-
-  EXPECT_GT(task.GetOutput(), 0);
-
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-  std::cout << "SEQ Task time: " << duration.count() << "ms\n";
-}
 
 }  // namespace moskaev_v_max_value_elem_matrix

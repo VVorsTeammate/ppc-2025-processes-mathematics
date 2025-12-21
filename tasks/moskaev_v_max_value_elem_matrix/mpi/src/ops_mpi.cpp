@@ -35,31 +35,63 @@ bool MoskaevVMaxValueElemMatrixMPI::RunImpl() {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-  const auto &matrix = GetInput();
-  auto total_rows = matrix.size();
+  int total_rows = 0;
+  int cols = 0;
+  std::vector<int> flat_matrix;
 
-  auto rows_per_process = total_rows / size;
-  auto remainder = total_rows % size;
+  if (rank == 0) {
+    const auto &matrix = GetInput();
+    total_rows = static_cast<int>(matrix.size());
+    if (total_rows > 0) {
+      cols = static_cast<int>(matrix[0].size());
 
-  size_t start_row = ((rank * rows_per_process) + (std::min(static_cast<size_t>(rank), remainder)));
-  size_t end_row = start_row + rows_per_process;
-  if (std::cmp_less(static_cast<size_t>(rank), remainder)) {
-    end_row += 1;
-  }
-
-  int local_max = INT_MIN;
-  for (size_t i = start_row; i < end_row; ++i) {
-    for (int element : matrix[i]) {
-      local_max = std::max(element, local_max);
+      flat_matrix.reserve(total_rows * cols);
+      for (const auto &row : matrix) {
+        flat_matrix.insert(flat_matrix.end(), row.begin(), row.end());
+      }
     }
   }
 
-  int global_max = 0;
+  MPI_Bcast(&total_rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
+  if (total_rows == 0 || cols == 0) {
+    GetOutput() = 0;
+    return true;
+  }
+
+  int rows_per_process = total_rows / size;
+  int remainder = total_rows % size;
+
+  int my_rows = rows_per_process + (rank < remainder ? 1 : 0);
+  int my_elements = my_rows * cols;
+
+  std::vector<int> local_data(my_elements, 0);
+
+  std::vector<int> sendcounts(size);
+  std::vector<int> displs(size);
+
+  int offset = 0;
+  for (int i = 0; i < size; i++) {
+    int rows_for_i = rows_per_process + (i < remainder ? 1 : 0);
+    sendcounts[i] = rows_for_i * cols;
+    displs[i] = offset * cols;
+    offset += rows_for_i;
+  }
+
+  MPI_Scatterv(rank == 0 ? flat_matrix.data() : nullptr, sendcounts.data(), displs.data(), MPI_INT, local_data.data(),
+               my_elements, MPI_INT, 0, MPI_COMM_WORLD);
+
+  int local_max = INT_MIN;
+  for (int element : local_data) {
+    local_max = std::max(local_max, element);
+  }
+
+  // Находим глобальный максимум
+  int global_max = 0;
   MPI_Allreduce(&local_max, &global_max, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
   GetOutput() = global_max;
-
   return true;
 }
 
