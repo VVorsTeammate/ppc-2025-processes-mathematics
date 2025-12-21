@@ -75,8 +75,8 @@ const std::array<TestType, 3> kTestParam = {std::make_tuple(HypercubeTestData(10
                                             std::make_tuple(HypercubeTestData(10, 777, true, true), "full_test")};
 
 const auto kTestTasksList =
-    std::tuple_cat(ppc::util::AddFuncTask<MoskaevVTestMPI, InType>(kTestParam, "moskaev_v_hypercube"),
-                   ppc::util::AddFuncTask<MoskaevVTestSEQ, InType>(kTestParam, "moskaev_v_hypercube"));
+    std::tuple_cat(ppc::util::AddFuncTask<MoskaevVTestMPI, InType>(kTestParam, PPC_SETTINGS_moskaev_v_hypercube),
+                   ppc::util::AddFuncTask<MoskaevVTestSEQ, InType>(kTestParam, PPC_SETTINGS_moskaev_v_hypercube));
 
 const auto kGtestValues = ppc::util::ExpandToValues(kTestTasksList);
 
