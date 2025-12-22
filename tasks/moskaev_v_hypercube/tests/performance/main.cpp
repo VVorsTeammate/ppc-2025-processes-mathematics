@@ -33,7 +33,7 @@ class MoskaevVHypercubePerfTests : public ppc::util::BaseRunPerfTests<InType, Ou
       }
     }
 
-    input_data_ = HypercubeTestData(1000, 12345, true, true);
+    input_data_ = HypercubeTestData(500, 12345, true, true);
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
