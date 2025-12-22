@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <mpi.h>
 
-#include <string>
 #include <array>
+#include <string>
 #include <tuple>
 
 #include "moskaev_v_hypercub/common/include/common.hpp"
@@ -27,7 +27,7 @@ class MoskaevVHypercubeFuncTests : public ppc::util::BaseRunFuncTests<InType, Ou
     auto test_data = std::get<2>(params);
 
     input_data_ = std::get<0>(test_data);
-    const std::string& test_name_str = test_name;
+    const std::string &test_name_str = test_name;
     bool is_mpi_test =
         (test_name_str.find("mpi") != std::string::npos) || (test_name_str.find("MPI") != std::string::npos);
 

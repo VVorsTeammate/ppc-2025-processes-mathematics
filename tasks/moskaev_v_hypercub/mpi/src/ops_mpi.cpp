@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 #include <random>
+
 #include "moskaev_v_hypercub/common/include/common.hpp"
 
 namespace moskaev_v_hypercub {

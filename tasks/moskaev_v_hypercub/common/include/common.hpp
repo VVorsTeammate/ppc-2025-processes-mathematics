@@ -26,7 +26,7 @@ struct HypercubeTestResult {
   int total_tests_passed{0};
   int max_hops_required{0};
 
-  HypercubeTestResult() = default; // Удалить старый конструктор
+  HypercubeTestResult() = default;  // Удалить старый конструктор
 };
 
 using InType = HypercubeTestData;
