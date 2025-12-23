@@ -4,8 +4,7 @@
 
 #include <algorithm>
 #include <climits>
-#include <cstddef>
-#include <utility>
+#include <vector>
 
 #include "moskaev_v_max_value_elem_matrix/common/include/common.hpp"
 
@@ -45,7 +44,7 @@ bool MoskaevVMaxValueElemMatrixMPI::RunImpl() {
     if (total_rows > 0) {
       cols = static_cast<int>(matrix[0].size());
 
-      flat_matrix.reserve(total_rows * cols);
+      flat_matrix.reserve(static_cast<size_t>(total_rows) * static_cast<size_t>(cols));
       for (const auto &row : matrix) {
         flat_matrix.insert(flat_matrix.end(), row.begin(), row.end());
       }

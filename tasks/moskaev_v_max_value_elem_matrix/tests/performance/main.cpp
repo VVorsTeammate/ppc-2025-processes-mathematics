@@ -1,8 +1,6 @@
 #include <gtest/gtest.h>
-#include <mpi.h>
 
-#include <chrono>
-#include <iostream>
+#include <algorithm>
 #include <random>
 #include <vector>
 
