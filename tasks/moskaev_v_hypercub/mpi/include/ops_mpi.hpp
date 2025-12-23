@@ -17,11 +17,6 @@ class MoskaevVTestMPI : public BaseTask {
   bool PreProcessingImpl() override;
   bool RunImpl() override;
   bool PostProcessingImpl() override;
-
-  void TestTopology(int rank, int size, HypercubeTestResult &result);
-  void TestCommunication(int rank, int size, HypercubeTestResult &result);
-  void TestComputation(int rank, int size, HypercubeTestResult &result);
-  void FinalizeResults(int rank, HypercubeTestResult &result);
 };
 
 }  // namespace moskaev_v_hypercub

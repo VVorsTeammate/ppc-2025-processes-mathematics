@@ -55,77 +55,57 @@ int HypercubeSum(int local_value, int rank, int size) {
   return result;
 }
 
-}  // namespace
-
-namespace {
-void SyncResultToAllProcesses(HypercubeTestResult &result, int rank) {
-  struct SyncData {
-    int total_tests_passed;
-    int topology_verified;
-    int communication_ok;
-    int computation_ok;
-    int max_hops_required;
-  };
-
-  SyncData data{};
-
-  if (rank == 0) {
-    data.total_tests_passed = result.total_tests_passed;
-    data.topology_verified = result.topology_verified ? 1 : 0;
-    data.communication_ok = result.communication_ok ? 1 : 0;
-    data.computation_ok = result.computation_ok ? 1 : 0;
-    data.max_hops_required = result.max_hops_required;
-  }
-
-  MPI_Bcast(&data, sizeof(SyncData), MPI_BYTE, 0, MPI_COMM_WORLD);
-
-  if (rank != 0) {
-    result.total_tests_passed = data.total_tests_passed;
-    result.topology_verified = data.topology_verified == 1;
-    result.communication_ok = data.communication_ok == 1;
-    result.computation_ok = data.computation_ok == 1;
-    result.max_hops_required = data.max_hops_required;
-  }
+bool CheckIfPowerOfTwo(int size) {
+  return size > 0 && (size & (size - 1)) == 0;
 }
-}  // namespace
 
-void MoskaevVTestMPI::TestTopology(int rank, int size, HypercubeTestResult &result) {
-  bool topology_ok = false;
+int CalculateHypercubeDimensions(int size) {
   int dimensions = 0;
+  while ((1 << dimensions) < size) {
+    dimensions++;
+  }
+  return dimensions;
+}
 
-  if (size > 0 && (size & (size - 1)) == 0) {
-    topology_ok = true;
+bool VerifySingleNeighbor(int rank, int neighbor, int dim) {
+  int send_val = (rank * 1000) + dim;
+  int recv_val = 0;
 
-    while ((1 << dimensions) < size) {
-      dimensions++;
+  MPI_Sendrecv(&send_val, 1, MPI_INT, neighbor, 100, &recv_val, 1, MPI_INT, neighbor, 100, MPI_COMM_WORLD,
+               MPI_STATUS_IGNORE);
+
+  int expected = (neighbor * 1000) + dim;
+  return recv_val == expected;
+}
+
+bool VerifyAllNeighbors(int rank, int size, int dimensions) {
+  for (int dim = 0; dim < dimensions; dim++) {
+    int neighbor = rank ^ (1 << dim);
+    if (neighbor < size && !VerifySingleNeighbor(rank, neighbor, dim)) {
+      return false;
     }
+  }
+  return true;
+}
 
-    for (int dim = 0; dim < dimensions; dim++) {
-      int neighbor = rank ^ (1 << dim);
-      if (neighbor < size) {
-        int send_val = (rank * 1000) + dim;
-        int recv_val = 0;
+void TestTopologyLogic(int rank, int size, HypercubeTestResult &result) {
+  bool topology_ok = CheckIfPowerOfTwo(size);
 
-        MPI_Sendrecv(&send_val, 1, MPI_INT, neighbor, 100, &recv_val, 1, MPI_INT, neighbor, 100, MPI_COMM_WORLD,
-                     MPI_STATUS_IGNORE);
-
-        int expected = (neighbor * 1000) + dim;
-        if (recv_val != expected) {
-          topology_ok = false;
-        }
-      }
-    }
+  if (topology_ok) {
+    int dimensions = CalculateHypercubeDimensions(size);
+    topology_ok = VerifyAllNeighbors(rank, size, dimensions);
   }
 
   int local_topology_ok = topology_ok ? 1 : 0;
   int global_topology_ok = 0;
+
   MPI_Reduce(&local_topology_ok, &global_topology_ok, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
 
   if (rank == 0) {
     result.topology_verified = (global_topology_ok == 1);
     if (result.topology_verified) {
       result.total_tests_passed++;
-      std::cout << "Topology: " << dimensions << "D hypercube with " << size << " processes - PASSED" << "\n";
+      std::cout << "Topology: PASSED" << "\n";
     } else {
       std::cout << "Topology: FAILED (not a valid hypercube)" << "\n";
     }
@@ -139,7 +119,7 @@ void MoskaevVTestMPI::TestTopology(int rank, int size, HypercubeTestResult &resu
   }
 }
 
-void MoskaevVTestMPI::TestCommunication(int rank, int size, HypercubeTestResult &result) {
+void TestCommunicationLogic(int rank, int size, HypercubeTestResult &result) {
   bool comm_ok = true;
   int max_hops = 0;
 
@@ -188,24 +168,24 @@ void MoskaevVTestMPI::TestCommunication(int rank, int size, HypercubeTestResult 
   }
 }
 
-void MoskaevVTestMPI::TestComputation(int rank, int size, HypercubeTestResult &result) {
-  std::mt19937 gen(GetInput().seed + rank);
+void TestComputationLogic(const InType &input, int rank, int size, HypercubeTestResult &result) {
+  std::mt19937 gen(input.seed + rank);
   std::uniform_int_distribution<int> dist(1, 100);
 
   int local_sum = 0;
-  for (int i = 0; i < GetInput().test_size; i++) {
+  for (int i = 0; i < input.test_size; i++) {
     local_sum += dist(gen);
   }
 
   int global_sum = HypercubeSum(local_sum, rank, size);
 
   if (rank == 0) {
-    std::mt19937 check_gen(GetInput().seed);
+    std::mt19937 check_gen(input.seed);
     int expected_sum = 0;
 
     for (int proc_rank = 0; proc_rank < size; proc_rank++) {
-      std::mt19937 proc_gen(GetInput().seed + proc_rank);
-      for (int i = 0; i < GetInput().test_size; i++) {
+      std::mt19937 proc_gen(input.seed + proc_rank);
+      for (int i = 0; i < input.test_size; i++) {
         expected_sum += dist(proc_gen);
       }
     }
@@ -229,7 +209,7 @@ void MoskaevVTestMPI::TestComputation(int rank, int size, HypercubeTestResult &r
   }
 }
 
-void MoskaevVTestMPI::FinalizeResults(int rank, HypercubeTestResult &result) {
+void FinalizeResultsLogic(int rank, HypercubeTestResult &result) {
   int final_total_passed = result.total_tests_passed;
   MPI_Bcast(&final_total_passed, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -241,6 +221,38 @@ void MoskaevVTestMPI::FinalizeResults(int rank, HypercubeTestResult &result) {
     std::cout << "Total tests passed: " << result.total_tests_passed << "/3" << "\n";
   }
 }
+
+void SyncResultToAllProcesses(HypercubeTestResult &result, int rank) {
+  struct SyncData {
+    int total_tests_passed;
+    int topology_verified;
+    int communication_ok;
+    int computation_ok;
+    int max_hops_required;
+  };
+
+  SyncData data{};
+
+  if (rank == 0) {
+    data.total_tests_passed = result.total_tests_passed;
+    data.topology_verified = result.topology_verified ? 1 : 0;
+    data.communication_ok = result.communication_ok ? 1 : 0;
+    data.computation_ok = result.computation_ok ? 1 : 0;
+    data.max_hops_required = result.max_hops_required;
+  }
+
+  MPI_Bcast(&data, sizeof(SyncData), MPI_BYTE, 0, MPI_COMM_WORLD);
+
+  if (rank != 0) {
+    result.total_tests_passed = data.total_tests_passed;
+    result.topology_verified = data.topology_verified == 1;
+    result.communication_ok = data.communication_ok == 1;
+    result.computation_ok = data.computation_ok == 1;
+    result.max_hops_required = data.max_hops_required;
+  }
+}
+
+}  // namespace
 
 MoskaevVTestMPI::MoskaevVTestMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
@@ -264,7 +276,7 @@ bool MoskaevVTestMPI::RunImpl() {
 
   HypercubeTestResult result;
 
-  TestTopology(rank, size, result);
+  TestTopologyLogic(rank, size, result);
 
   if (!result.topology_verified) {
     SyncResultToAllProcesses(result, rank);
@@ -273,13 +285,14 @@ bool MoskaevVTestMPI::RunImpl() {
   }
 
   if (GetInput().test_communication) {
-    TestCommunication(rank, size, result);
+    TestCommunicationLogic(rank, size, result);
   }
 
   if (GetInput().test_computation) {
-    TestComputation(rank, size, result);
+    TestComputationLogic(GetInput(), rank, size, result);
   }
-  FinalizeResults(rank, result);
+
+  FinalizeResultsLogic(rank, result);
 
   GetOutput() = result;
 
