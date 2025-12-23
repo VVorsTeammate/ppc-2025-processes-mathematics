@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstddef>
 #include <vector>
 
 #include "moskaev_v_max_value_elem_matrix/common/include/common.hpp"
