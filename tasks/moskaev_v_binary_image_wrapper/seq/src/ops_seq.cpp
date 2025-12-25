@@ -1,10 +1,13 @@
 #include "moskaev_v_binary_image_wrapper/seq/include/ops_seq.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
-#include <iostream>
+#include <cstddef>
 #include <queue>
 #include <vector>
+
+#include "moskaev_v_binary_image_wrapper/common/include/common.hpp"
 
 namespace moskaev_v_binary_image_wrapper {
 
@@ -13,8 +16,8 @@ namespace {
 const std::array<std::array<int, 2>, 8> kDirections = {
     {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}}};
 
-int cross(const Point &O, const Point &A, const Point &B) {
-  return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
+int Cross(const Point &o, const Point &a, const Point &b) {
+  return ((a.x - o.x) * (b.y - o.y)) - ((a.y - o.y) * (b.x - o.x));
 }
 
 std::vector<Point> FindConnectedComponent(const std::vector<int> &image, int width, int height, int start_x,
@@ -26,7 +29,7 @@ std::vector<Point> FindConnectedComponent(const std::vector<int> &image, int wid
 
   std::queue<Point> queue;
   queue.emplace(start_x, start_y);
-  visited[start_y * width + start_x] = true;
+  visited[(start_y * width) + start_x] = true;
 
   while (!queue.empty()) {
     Point current = queue.front();
@@ -38,10 +41,10 @@ std::vector<Point> FindConnectedComponent(const std::vector<int> &image, int wid
       int ny = current.y + kDirections[i][1];
 
       if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-        int index = ny * width + nx;
+        int index = (ny * width) + nx;
         if (!visited[index] && image[index] == 1) {
           visited[index] = true;
-          queue.push(Point(nx, ny));
+          queue.emplace(Point(nx, ny));
         }
       }
     }
@@ -50,7 +53,7 @@ std::vector<Point> FindConnectedComponent(const std::vector<int> &image, int wid
   return component;
 }
 
-Point findPivotPoint(const std::vector<Point> &points) {
+Point FindPivotPoint(const std::vector<Point> &points) {
   Point pivot = points[0];
   for (size_t i = 1; i < points.size(); ++i) {
     if (points[i].y < pivot.y || (points[i].y == pivot.y && points[i].x < pivot.x)) {
@@ -60,29 +63,29 @@ Point findPivotPoint(const std::vector<Point> &points) {
   return pivot;
 }
 
-bool polarCompare(const Point &pivot, const Point &a, const Point &b) {
-  int orientation = cross(pivot, a, b);
+bool PolarCompare(const Point &pivot, const Point &a, const Point &b) {
+  int orientation = Cross(pivot, a, b);
   if (orientation == 0) {
-    int dist1 = (a.x - pivot.x) * (a.x - pivot.x) + (a.y - pivot.y) * (a.y - pivot.y);
-    int dist2 = (b.x - pivot.x) * (b.x - pivot.x) + (b.y - pivot.y) * (b.y - pivot.y);
+    int dist1 = ((a.x - pivot.x) * (a.x - pivot.x)) + ((a.y - pivot.y) * (a.y - pivot.y));
+    int dist2 = ((b.x - pivot.x) * (b.x - pivot.x)) + ((b.y - pivot.y) * (b.y - pivot.y));
     return dist1 < dist2;
   }
   return orientation > 0;
 }
 
-std::vector<Point> grahamScan(std::vector<Point> points) {
+std::vector<Point> GrahamScan(std::vector<Point> points) {
   if (points.size() < 3) {
     return points;
   }
 
-  Point pivot = findPivotPoint(points);
+  Point pivot = FindPivotPoint(points);
 
   auto it = std::remove_if(points.begin(), points.end(),
                            [&pivot](const Point &p) { return p.x == pivot.x && p.y == pivot.y; });
   points.erase(it, points.end());
 
   std::sort(points.begin(), points.end(),
-            [&pivot](const Point &a, const Point &b) { return polarCompare(pivot, a, b); });
+            [&pivot](const Point &a, const Point &b) { return PolarCompare(pivot, a, b); });
 
   std::vector<Point> hull;
   hull.push_back(pivot);
@@ -94,10 +97,10 @@ std::vector<Point> grahamScan(std::vector<Point> points) {
 
     for (size_t i = 2; i < points.size(); ++i) {
       while (hull.size() >= 2) {
-        const Point &A = hull[hull.size() - 2];
-        const Point &B = hull.back();
+        const Point &a = hull[hull.size() - 2];
+        const Point &b = hull.back();
 
-        if (cross(A, B, points[i]) <= 0) {
+        if (Cross(a, b, points[i]) <= 0) {
           hull.pop_back();
         } else {
           break;
@@ -110,16 +113,16 @@ std::vector<Point> grahamScan(std::vector<Point> points) {
   return hull;
 }
 
-std::vector<std::vector<Point>> findAllComponents(const std::vector<int> &image, int width, int height) {
+std::vector<std::vector<Point>> FindAllComponents(const std::vector<int> &image, int width, int height) {
   std::vector<std::vector<Point>> components;
   std::vector<bool> visited(width * height, false);
 
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      int index = y * width + x;
+  for (int yy = 0; yy < height; ++yy) {
+    for (int xx = 0; xx < width; ++xx) {
+      int index = yy * width + xx;
 
       if (image[index] == 1 && !visited[index]) {
-        std::vector<Point> component = FindConnectedComponent(image, width, height, x, y, visited);
+        std::vector<Point> component = FindConnectedComponent(image, width, height, xx, yy, visited);
 
         if (component.size() >= 3) {
           components.push_back(std::move(component));
@@ -161,24 +164,24 @@ bool MoskaevVTestTaskSEQ::RunImpl() {
   int width = input[0];
   int height = input[1];
 
-  std::vector<int> imageData(input.begin() + 2, input.end());
+  std::vector<int> image_data(input.begin() + 2, input.end());
 
-  std::vector<std::vector<Point>> components = findAllComponents(imageData, width, height);
+  std::vector<std::vector<Point>> components = FindAllComponents(image_data, width, height);
 
   std::vector<std::vector<std::pair<int, int>>> result;
   result.reserve(components.size());
 
   for (const auto &component : components) {
-    std::vector<Point> hull = grahamScan(component);
+    std::vector<Point> hull = GrahamScan(component);
 
     if (!hull.empty()) {
-      std::vector<std::pair<int, int>> hullPairs;
-      hullPairs.reserve(hull.size());
+      std::vector<std::pair<int, int>> hull_pairs;
+      hull_pairs.reserve(hull.size());
 
       for (const auto &p : hull) {
-        hullPairs.emplace_back(p.x, p.y);
+        hull_pairs.emplace_back(p.x, p.y);
       }
-      result.push_back(std::move(hullPairs));
+      result.push_back(std::move(hull_pairs));
     }
   }
 

@@ -6,13 +6,10 @@
 #include <array>
 #include <chrono>
 #include <cstddef>
-#include <iostream>
 #include <queue>
-#include <set>
-#include <string>
-#include <unordered_map>
-#include <utility>
 #include <vector>
+
+#include "moskaev_v_binary_image_wrapper/common/include/common.hpp"
 
 namespace moskaev_v_binary_image_wrapper {
 
@@ -62,7 +59,7 @@ int Cross(const Point &origin, const Point &a, const Point &b) {  // лучши�
   return ((a.x - origin.x) * (b.y - origin.y)) - ((a.y - origin.y) * (b.x - origin.x));
 }
 
-Point findPivot(const std::vector<Point> &points) {
+Point FindPivot(const std::vector<Point> &points) {
   Point pivot = points[0];
   for (size_t i = 1; i < points.size(); ++i) {
     if (points[i].y < pivot.y || (points[i].y == pivot.y && points[i].x < pivot.x)) {
@@ -75,9 +72,11 @@ Point findPivot(const std::vector<Point> &points) {
 bool polarCompare(const Point &pivot, const Point &a, const Point &b) {
   int orientation = Cross(pivot, a, b);
   if (orientation == 0) {
-    int dx1 = a.x - pivot.x, dy1 = a.y - pivot.y;
-    int dx2 = b.x - pivot.x, dy2 = b.y - pivot.y;
-    return (dx1 * dx1 + dy1 * dy1) < (dx2 * dx2 + dy2 * dy2);
+    int dx1 = a.x - pivot.x;
+    int dy1 = a.y - pivot.y;
+    int dx2 = b.x - pivot.x;
+    int dy2 = b.y - pivot.y;
+    return ((dx1 * dx1) + (dy1 * dy1)) < ((dx2 * dx2) + (dy2 * dy2));
   }
   return orientation > 0;
 }
@@ -87,7 +86,7 @@ std::vector<Point> grahamScan(std::vector<Point> points) {
     return points;
   }
 
-  Point pivot = findPivot(points);
+  Point pivot = FindPivot(points);
 
   points.erase(std::remove_if(points.begin(), points.end(),
                               [&pivot](const Point &p) { return p.x == pivot.x && p.y == pivot.y; }),
@@ -118,7 +117,7 @@ std::vector<Point> grahamScan(std::vector<Point> points) {
   return hull;
 }
 
-std::vector<std::vector<std::pair<int, int>>> parallelConvexHullsSimple(const std::vector<int> &image, int width,
+std::vector<std::vector<std::pair<int, int>>> ParallelConvexHullsSimple(const std::vector<int> &image, int width,
                                                                         int height) {
   int rank = 0;
   int size = 0;
@@ -148,14 +147,14 @@ std::vector<std::vector<std::pair<int, int>>> parallelConvexHullsSimple(const st
 
     for (int row = start_row; row < end_row; ++row) {
       for (int col = 0; col < width; ++col) {
-        int global_idx = row * width + col;
-        int local_idx = (row - start_row) * width + col;
+        int global_idx = (row * width) + col;
+        int local_idx = ((row - start_row) * width) + col;
 
         if (image[global_idx] == 1 && !visited[local_idx]) {
           std::queue<Point> q;
           std::vector<Point> comp;
 
-          q.push(Point(col, row));
+          q.emplace(Point(col, row));
           visited[local_idx] = true;
 
           while (!q.empty()) {
@@ -168,8 +167,8 @@ std::vector<std::vector<std::pair<int, int>>> parallelConvexHullsSimple(const st
               int ny = p.y + dir[1];
 
               if (nx >= 0 && nx < width && ny >= start_row && ny < end_row) {
-                int n_global_idx = ny * width + nx;
-                int n_local_idx = (ny - start_row) * width + nx;
+                int n_global_idx = (ny * width) + nx;
+                int n_local_idx = ((ny - start_row) * width) + nx;
 
                 if (image[n_global_idx] == 1 && !visited[n_local_idx]) {
                   visited[n_local_idx] = true;
@@ -219,7 +218,7 @@ std::vector<std::vector<std::pair<int, int>>> parallelConvexHullsSimple(const st
           comp.reserve(comp_size);
 
           for (int j = 0; j < comp_size; ++j) {
-            comp.emplace_back(buffer[j * 2], buffer[j * 2 + 1]);
+            comp.emplace_back(buffer[j * 2], buffer[(j * 2) + 1]);
           }
 
           auto hull = grahamScan(comp);
@@ -247,7 +246,7 @@ std::vector<std::vector<std::pair<int, int>>> parallelConvexHullsSimple(const st
         std::vector<int> buffer(comp_size * 2, 0);
         for (int i = 0; i < comp_size; ++i) {
           buffer[i * 2] = comp[i].x;
-          buffer[i * 2 + 1] = comp[i].y;
+          buffer[(i * 2) + 1] = comp[i].y;
         }
         MPI_Send(buffer.data(), comp_size * 2, MPI_INT, 0, 0, MPI_COMM_WORLD);
       }
@@ -295,8 +294,8 @@ bool MoskaevVTestTaskMPI::RunImpl() {
   int width = input[0];
   int height = input[1];
 
-  std::vector<int> imageData(input.begin() + 2, input.end());
-  auto hulls = parallelConvexHullsSimple(imageData, width, height);
+  std::vector<int> image_data(input.begin() + 2, input.end());
+  auto hulls = ParallelConvexHullsSimple(image_data, width, height);
 
   auto end_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = end_time - start_time;

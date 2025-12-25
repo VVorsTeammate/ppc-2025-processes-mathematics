@@ -2,10 +2,8 @@
 #include <gtest/gtest.h>
 #include <mpi.h>
 
-#include <algorithm>
-#include <chrono>
-#include <iostream>
 #include <random>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -33,8 +31,8 @@ void GenerateTestImage(InType &input_data, int width, int height, int seed = 42)
 
   // Добавляем несколько больших объектов
   for (int obj = 0; obj < 5; ++obj) {
-    int center_x = (obj * width / 6) + width / 12;
-    int center_y = (obj * height / 6) + height / 12;
+    int center_x = (obj * width / 6) + (width / 12);
+    int center_y = (obj * height / 6) + (height / 12);
     int size = 20 + (obj * 10);
 
     // Квадрат
