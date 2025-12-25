@@ -12,7 +12,6 @@
 namespace moskaev_v_binary_image_wrapper {
 
 namespace {
-const int PARALLEL_DIRS[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 const int BFS_DIRS[8][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
 class UnionFind {
  private:
@@ -111,75 +110,6 @@ std::vector<Point> grahamScan(std::vector<Point> points) {
   }
 
   return hull;
-}
-
-std::vector<Point> findComponentBFS(const std::vector<int> &img, int w, int h, int startX, int startY,
-                                    std::vector<bool> &visited) {
-  std::vector<Point> comp;
-  std::queue<Point> q;
-
-  if (img[startY * w + startX] != 1) {
-    return comp;
-  }
-
-  q.push(Point(startX, startY));
-  visited[startY * w + startX] = true;
-
-  while (!q.empty()) {
-    Point p = q.front();
-    q.pop();
-    comp.push_back(p);
-
-    for (int i = 0; i < 8; ++i) {
-      int nx = p.x + BFS_DIRS[i][0];
-      int ny = p.y + BFS_DIRS[i][1];
-
-      if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
-        int idx = ny * w + nx;
-        if (!visited[idx] && img[idx] == 1) {
-          visited[idx] = true;
-          q.push(Point(nx, ny));
-        }
-      }
-    }
-  }
-
-  return comp;
-}
-
-std::vector<int> getBoundaryPixels(const std::vector<int> &local_image, int local_width, int local_height, int rank,
-                                   int size) {
-  std::vector<int> boundary_pixels;
-
-  if (size == 1) {
-    return boundary_pixels;
-  }
-
-  bool has_up = (rank > 0);
-  bool has_down = (rank < size - 1);
-
-  if (has_up && local_height > 0) {
-    for (int x = 0; x < local_width; ++x) {
-      if (local_image[x] == 1) {
-        boundary_pixels.push_back(x);
-        boundary_pixels.push_back(0);
-        boundary_pixels.push_back(rank - 1);
-      }
-    }
-  }
-
-  if (has_down && local_height > 0) {
-    int last_row_start = (local_height - 1) * local_width;
-    for (int x = 0; x < local_width; ++x) {
-      if (local_image[last_row_start + x] == 1) {
-        boundary_pixels.push_back(x);
-        boundary_pixels.push_back(local_height - 1);
-        boundary_pixels.push_back(rank + 1);
-      }
-    }
-  }
-
-  return boundary_pixels;
 }
 
 std::vector<std::vector<std::pair<int, int>>> parallelConvexHullsSimple(const std::vector<int> &image, int width,
