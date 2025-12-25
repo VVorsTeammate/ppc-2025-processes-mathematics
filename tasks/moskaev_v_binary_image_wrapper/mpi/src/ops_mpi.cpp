@@ -6,11 +6,11 @@
 #include <array>
 #include <chrono>
 #include <cstddef>
-#include <iterator>  // Для std::move
 #include <queue>
-#include <ranges>   // Для std::ranges
-#include <utility>  // Для std::pair
+#include <utility>
 #include <vector>
+
+#include "moskaev_v_binary_image_wrapper/common/include/common.hpp"
 
 namespace moskaev_v_binary_image_wrapper {
 
@@ -18,21 +18,19 @@ namespace {
 const std::array<std::array<int, 2>, 8> kBfsDirs = {
     {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}}};
 
-// 1. Объявляем ВСЕ вспомогательные функции вначале
 std::vector<Point> BfsFindComponent(const std::vector<int> &image, int width, int start_row, int end_row, int start_x,
                                     int start_y, std::vector<bool> &visited);
 
 std::vector<std::vector<Point>> FindLocalComponents(const std::vector<int> &image, int width, int height, int start_row,
                                                     int end_row);
 
-void ProcessLocalComponents(int rank, const std::vector<std::vector<Point>> &local_components,
+void ProcessLocalComponents(const std::vector<std::vector<Point>> &local_components,
                             std::vector<std::vector<std::pair<int, int>>> &result);
 
 void ReceiveAndProcessRemoteComponents(int size, std::vector<std::vector<std::pair<int, int>>> &result);
 
 void SendComponentsToRoot(const std::vector<std::vector<Point>> &local_components);
 
-// 2. Объявляем UnionFind и геометрические функции
 class UnionFind {
  public:
   explicit UnionFind(int n) : parent_(n), rank_(n, 0) {
@@ -42,10 +40,11 @@ class UnionFind {
   }
 
   int Find(int x) {
-    if (parent_[x] != x) {
-      parent_[x] = Find(parent_[x]);
+    while (parent_[x] != x) {
+      parent_[x] = parent_[parent_[x]];
+      x = parent_[x];
     }
-    return parent_[x];
+    return x;
   }
 
   void Unite(int x, int y) {
@@ -93,7 +92,9 @@ bool PolarCompare(const Point &pivot, const Point &a, const Point &b) {
     int dy1 = a.y - pivot.y;
     int dx2 = b.x - pivot.x;
     int dy2 = b.y - pivot.y;
-    return (dx1 * dx1 + dy1 * dy1) < (dx2 * dx2 + dy2 * dy2);
+    int dist1 = (dx1 * dx1) + (dy1 * dy1);
+    int dist2 = (dx2 * dx2) + (dy2 * dy2);
+    return dist1 < dist2;
   }
   return orientation > 0;
 }
@@ -105,14 +106,16 @@ std::vector<Point> GrahamScan(std::vector<Point> points) {
 
   Point pivot = FindPivot(points);
 
-  // Используем std::erase_if из C++20
-  std::erase_if(points, [&pivot](const Point &p) { return p.x == pivot.x && p.y == pivot.y; });
+  points.erase(std::remove_if(points.begin(), points.end(),
+                              [&pivot](const Point &p) { return p.x == pivot.x && p.y == pivot.y; }),
+               points.end());
 
   if (points.empty()) {
     return {pivot};
   }
 
-  std::ranges::sort(points, [&pivot](const Point &a, const Point &b) { return PolarCompare(pivot, a, b); });
+  std::sort(points.begin(), points.end(),
+            [&pivot](const Point &a, const Point &b) { return PolarCompare(pivot, a, b); });
 
   std::vector<Point> hull;
   hull.push_back(pivot);
@@ -135,14 +138,14 @@ std::vector<Point> GrahamScan(std::vector<Point> points) {
   return hull;
 }
 
-// 3. Реализации вспомогательных функций
 std::vector<Point> BfsFindComponent(const std::vector<int> &image, int width, int start_row, int end_row, int start_x,
                                     int start_y, std::vector<bool> &visited) {
   std::vector<Point> component;
   std::queue<Point> q;
 
   q.emplace(start_x, start_y);
-  visited[static_cast<size_t>((start_y - start_row) * width + start_x)] = true;
+  int local_index = ((start_y - start_row) * width) + start_x;
+  visited[static_cast<size_t>(local_index)] = true;
 
   while (!q.empty()) {
     Point p = q.front();
@@ -154,11 +157,11 @@ std::vector<Point> BfsFindComponent(const std::vector<int> &image, int width, in
       int ny = p.y + dir[1];
 
       if (nx >= 0 && nx < width && ny >= start_row && ny < end_row) {
-        size_t n_local_idx = static_cast<size_t>((ny - start_row) * width + nx);
-        size_t n_global_idx = static_cast<size_t>(ny * width + nx);
+        int n_local_idx = ((ny - start_row) * width) + nx;
+        size_t n_global_idx = (static_cast<size_t>(ny) * static_cast<size_t>(width)) + static_cast<size_t>(nx);
 
-        if (!visited[n_local_idx] && image[n_global_idx] == 1) {
-          visited[n_local_idx] = true;
+        if (!visited[static_cast<size_t>(n_local_idx)] && image[n_global_idx] == 1) {
+          visited[static_cast<size_t>(n_local_idx)] = true;
           q.emplace(nx, ny);
         }
       }
@@ -182,10 +185,10 @@ std::vector<std::vector<Point>> FindLocalComponents(const std::vector<int> &imag
 
   for (int row = start_row; row < end_row; ++row) {
     for (int col = 0; col < width; ++col) {
-      size_t global_idx = static_cast<size_t>(row * width + col);
-      size_t local_idx = static_cast<size_t>((row - start_row) * width + col);
+      size_t global_idx = (static_cast<size_t>(row) * static_cast<size_t>(width)) + static_cast<size_t>(col);
+      int local_idx = ((row - start_row) * width) + col;
 
-      if (image[global_idx] == 1 && !visited[local_idx]) {
+      if (image[global_idx] == 1 && !visited[static_cast<size_t>(local_idx)]) {
         auto comp = BfsFindComponent(image, width, start_row, end_row, col, row, visited);
         if (comp.size() >= 3) {
           local_components.push_back(std::move(comp));
@@ -197,9 +200,8 @@ std::vector<std::vector<Point>> FindLocalComponents(const std::vector<int> &imag
   return local_components;
 }
 
-void ProcessLocalComponents(int rank, const std::vector<std::vector<Point>> &local_components,
+void ProcessLocalComponents(const std::vector<std::vector<Point>> &local_components,
                             std::vector<std::vector<std::pair<int, int>>> &result) {
-  (void)rank;
   for (const auto &comp : local_components) {
     auto hull = GrahamScan(comp);
     if (!hull.empty()) {
@@ -214,41 +216,42 @@ void ProcessLocalComponents(int rank, const std::vector<std::vector<Point>> &loc
   }
 }
 
-void ReceiveAndProcessRemoteComponents(int size, std::vector<std::vector<std::pair<int, int>>> &result) {
-  for (int src = 1; src < size; ++src) {
-    int num_components = 0;
-    MPI_Recv(&num_components, 1, MPI_INT, src, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+void ReceiveComponentFromSource(int src, std::vector<std::vector<std::pair<int, int>>> &result) {
+  int num_components = 0;
+  MPI_Recv(&num_components, 1, MPI_INT, src, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-    for (int i = 0; i < num_components; ++i) {
-      int comp_size = 0;
-      MPI_Recv(&comp_size, 1, MPI_INT, src, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  for (int i = 0; i < num_components; ++i) {
+    int comp_size = 0;
+    MPI_Recv(&comp_size, 1, MPI_INT, src, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-      if (comp_size > 0) {
-        size_t buffer_size = static_cast<size_t>(comp_size) * 2;
-        std::vector<int> buffer(buffer_size, 0);
+    if (comp_size > 0) {
+      std::vector<int> buffer(static_cast<size_t>(comp_size) * 2, 0);
+      MPI_Recv(buffer.data(), comp_size * 2, MPI_INT, src, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        MPI_Recv(buffer.data(), static_cast<int>(buffer_size), MPI_INT, src, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      std::vector<Point> comp;
+      comp.reserve(static_cast<size_t>(comp_size));
 
-        std::vector<Point> comp;
-        comp.reserve(comp_size);
+      for (int j = 0; j < comp_size; ++j) {
+        comp.emplace_back(buffer[static_cast<size_t>(j) * 2], buffer[(static_cast<size_t>(j) * 2) + 1]);
+      }
 
-        for (int j = 0; j < comp_size; ++j) {
-          size_t idx = static_cast<size_t>(j) * 2;
-          comp.emplace_back(buffer[idx], buffer[idx + 1]);
+      auto hull = GrahamScan(comp);
+      if (!hull.empty()) {
+        std::vector<std::pair<int, int>> hull_pairs;
+        hull_pairs.reserve(hull.size());
+
+        for (const auto &p : hull) {
+          hull_pairs.emplace_back(p.x, p.y);
         }
-
-        auto hull = GrahamScan(comp);
-        if (!hull.empty()) {
-          std::vector<std::pair<int, int>> hull_pairs;
-          hull_pairs.reserve(hull.size());
-
-          for (const auto &p : hull) {
-            hull_pairs.emplace_back(p.x, p.y);
-          }
-          result.push_back(std::move(hull_pairs));
-        }
+        result.push_back(std::move(hull_pairs));
       }
     }
+  }
+}
+
+void ReceiveAndProcessRemoteComponents(int size, std::vector<std::vector<std::pair<int, int>>> &result) {
+  for (int src = 1; src < size; ++src) {
+    ReceiveComponentFromSource(src, result);
   }
 }
 
@@ -261,21 +264,18 @@ void SendComponentsToRoot(const std::vector<std::vector<Point>> &local_component
     MPI_Send(&comp_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
 
     if (comp_size > 0) {
-      size_t buffer_size = static_cast<size_t>(comp_size) * 2;
-      std::vector<int> buffer(buffer_size, 0);
+      std::vector<int> buffer(static_cast<size_t>(comp_size) * 2, 0);
 
       for (int i = 0; i < comp_size; ++i) {
-        size_t idx = static_cast<size_t>(i) * 2;
-        buffer[idx] = comp[i].x;
-        buffer[idx + 1] = comp[i].y;
+        buffer[static_cast<size_t>(i) * 2] = comp[static_cast<size_t>(i)].x;
+        buffer[static_cast<size_t>(i) * 2 + 1] = comp[static_cast<size_t>(i)].y;
       }
 
-      MPI_Send(buffer.data(), static_cast<int>(buffer_size), MPI_INT, 0, 0, MPI_COMM_WORLD);
+      MPI_Send(buffer.data(), comp_size * 2, MPI_INT, 0, 0, MPI_COMM_WORLD);
     }
   }
 }
 
-// 4. Основная функция с низкой когнитивной сложностью
 std::vector<std::vector<std::pair<int, int>>> ParallelConvexHullsSimple(const std::vector<int> &image, int width,
                                                                         int height) {
   int rank = 0;
@@ -283,7 +283,6 @@ std::vector<std::vector<std::pair<int, int>>> ParallelConvexHullsSimple(const st
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-  // Вычисляем границы строк для каждого процесса
   int rows_per_process = (size > 0 && height > 0) ? height / size : 0;
   int extra_rows = (size > 0 && height > 0) ? height % size : 0;
 
@@ -293,19 +292,15 @@ std::vector<std::vector<std::pair<int, int>>> ParallelConvexHullsSimple(const st
   }
   int end_row = start_row + rows_per_process + (rank < extra_rows ? 1 : 0);
 
-  // Находим локальные компоненты
   auto local_components = FindLocalComponents(image, width, height, start_row, end_row);
 
   std::vector<std::vector<std::pair<int, int>>> result;
 
   if (rank == 0) {
-    // Обрабатываем локальные компоненты процесса 0
-    ProcessLocalComponents(rank, local_components, result);
+    ProcessLocalComponents(local_components, result);
 
-    // Принимаем и обрабатываем компоненты от других процессов
     ReceiveAndProcessRemoteComponents(size, result);
   } else {
-    // Отправляем компоненты на корневой процесс
     SendComponentsToRoot(local_components);
   }
 
@@ -315,7 +310,6 @@ std::vector<std::vector<std::pair<int, int>>> ParallelConvexHullsSimple(const st
 
 }  // namespace
 
-// Класс MoskaevVTestTaskMPI остается без изменений
 MoskaevVTestTaskMPI::MoskaevVTestTaskMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;

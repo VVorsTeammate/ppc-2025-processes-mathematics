@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <random>
 #include <string>
@@ -25,40 +26,33 @@ void GenerateTestImage(InType &input_data, int width, int height, int seed = 42)
 
   std::mt19937 gen(seed);
   std::uniform_int_distribution<> pixel_dist(0, 1);
-  std::uniform_int_distribution<> shape_dist(0, 100);
 
-  const std::size_t total_size = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+  const size_t total_size = static_cast<size_t>(width) * static_cast<size_t>(height);
   std::vector<int> image(total_size, 0);
 
-  // Добавляем несколько больших объектов
   for (int obj = 0; obj < 5; ++obj) {
     int center_x = (obj * width / 6) + (width / 12);
     int center_y = (obj * height / 6) + (height / 12);
-    int size = 20 + (obj * 10);
+    int size_obj = 20 + (obj * 10);
 
-    // Квадрат
-    for (int dx = -size; dx <= size; ++dx) {
-      for (int dy = -size; dy <= size; ++dy) {
+    for (int dx = -size_obj; dx <= size_obj; ++dx) {
+      for (int dy = -size_obj; dy <= size_obj; ++dy) {
         int x = center_x + dx;
         int y = center_y + dy;
         if (x >= 0 && x < width && y >= 0 && y < height) {
-          image[(static_cast<std::size_t>(y) * width) + x] = 1;
+          image[(static_cast<size_t>(y) * static_cast<size_t>(width)) + static_cast<size_t>(x)] = 1;
         }
       }
     }
   }
 
-  // Добавляем случайные точки
-  for (int i = 0; i < width * height / 100; ++i) {
-    int x = static_cast<int>(gen() % static_cast<unsigned long>(width));
-    int y = static_cast<int>(gen() % static_cast<unsigned long>(height));
-    image[(static_cast<std::size_t>(y) * width) + x] = 1;
+  for (size_t i = 0; i < total_size / 100; ++i) {
+    int x = static_cast<int>(gen() % static_cast<uint32_t>(width));
+    int y = static_cast<int>(gen() % static_cast<uint32_t>(height));
+    image[(static_cast<size_t>(y) * static_cast<size_t>(width)) + static_cast<size_t>(x)] = 1;
   }
 
-  // Копируем в input_data
-  for (int pixel : image) {
-    input_data.push_back(pixel);
-  }
+  input_data.insert(input_data.end(), image.begin(), image.end());
 }
 
 }  // namespace
@@ -110,7 +104,6 @@ const auto kPerfTestName = MoskaevVPerfTests::CustomPerfTestName;
 INSTANTIATE_TEST_SUITE_P(RunModeTests, MoskaevVPerfTests, kGtestValues, kPerfTestName);
 
 TEST(MoskaevVSeqMinimal, TimeMeasurement) {
-  // Проверяем, инициализирован ли MPI
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
 
