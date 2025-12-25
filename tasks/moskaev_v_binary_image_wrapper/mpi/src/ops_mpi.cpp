@@ -3,38 +3,40 @@
 #include <mpi.h>
 
 #include <algorithm>
+#include <array>
+#include <chrono>
+#include <cstddef>
 #include <iostream>
 #include <queue>
 #include <set>
+#include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace moskaev_v_binary_image_wrapper {
 
 namespace {
-const int BFS_DIRS[8][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
+const std::array<std::array<int, 2>, 8> kBfsDirs = {
+    {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}}};
 class UnionFind {
- private:
-  std::vector<int> parent_;
-  std::vector<int> rank_;
-
  public:
-  UnionFind(int n) : parent_(n), rank_(n, 0) {
+  explicit UnionFind(int n) : parent_(n), rank_(n, 0) {
     for (int i = 0; i < n; ++i) {
       parent_[i] = i;
     }
   }
 
-  int find(int x) {
+  int Find(int x) {
     if (parent_[x] != x) {
-      parent_[x] = find(parent_[x]);
+      parent_[x] = Find(parent_[x]);
     }
     return parent_[x];
   }
 
-  void unite(int x, int y) {
-    int rx = find(x);
-    int ry = find(y);
+  void Unite(int x, int y) {
+    int rx = Find(x);
+    int ry = Find(y);
     if (rx != ry) {
       if (rank_[rx] < rank_[ry]) {
         parent_[rx] = ry;
@@ -47,13 +49,17 @@ class UnionFind {
     }
   }
 
-  bool connected(int x, int y) {
-    return find(x) == find(y);
+  bool Connected(int x, int y) {
+    return Find(x) == Find(y);
   }
+
+ private:
+  std::vector<int> parent_;
+  std::vector<int> rank_;
 };
 
-int cross(const Point &O, const Point &A, const Point &B) {
-  return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
+int Cross(const Point &origin, const Point &a, const Point &b) {  // лучшие имена параметров
+  return ((a.x - origin.x) * (b.y - origin.y)) - ((a.y - origin.y) * (b.x - origin.x));
 }
 
 Point findPivot(const std::vector<Point> &points) {
@@ -67,7 +73,7 @@ Point findPivot(const std::vector<Point> &points) {
 }
 
 bool polarCompare(const Point &pivot, const Point &a, const Point &b) {
-  int orientation = cross(pivot, a, b);
+  int orientation = Cross(pivot, a, b);
   if (orientation == 0) {
     int dx1 = a.x - pivot.x, dy1 = a.y - pivot.y;
     int dx2 = b.x - pivot.x, dy2 = b.y - pivot.y;
@@ -102,7 +108,7 @@ std::vector<Point> grahamScan(std::vector<Point> points) {
     hull.push_back(points[1]);
 
     for (size_t i = 2; i < points.size(); ++i) {
-      while (hull.size() >= 2 && cross(hull[hull.size() - 2], hull.back(), points[i]) <= 0) {
+      while (hull.size() >= 2 && Cross(hull[hull.size() - 2], hull.back(), points[i]) <= 0) {
         hull.pop_back();
       }
       hull.push_back(points[i]);
@@ -138,18 +144,18 @@ std::vector<std::vector<std::pair<int, int>>> parallelConvexHullsSimple(const st
   std::vector<std::vector<Point>> local_components;
 
   if (end_row > start_row) {
-    std::vector<bool> visited(width * (end_row - start_row), false);
+    std::vector<bool> visited(static_cast<std::size_t>(width * (end_row - start_row)), false);
 
-    for (int y = start_row; y < end_row; ++y) {
-      for (int x = 0; x < width; ++x) {
-        int global_idx = y * width + x;
-        int local_idx = (y - start_row) * width + x;
+    for (int row = start_row; row < end_row; ++row) {
+      for (int col = 0; col < width; ++col) {
+        int global_idx = row * width + col;
+        int local_idx = (row - start_row) * width + col;
 
         if (image[global_idx] == 1 && !visited[local_idx]) {
           std::queue<Point> q;
           std::vector<Point> comp;
 
-          q.push(Point(x, y));
+          q.push(Point(col, row));
           visited[local_idx] = true;
 
           while (!q.empty()) {
@@ -157,9 +163,9 @@ std::vector<std::vector<std::pair<int, int>>> parallelConvexHullsSimple(const st
             q.pop();
             comp.push_back(p);
 
-            for (int d = 0; d < 8; ++d) {
-              int nx = p.x + BFS_DIRS[d][0];
-              int ny = p.y + BFS_DIRS[d][1];
+            for (const auto &dir : kBfsDirs) {
+              int nx = p.x + dir[0];
+              int ny = p.y + dir[1];
 
               if (nx >= 0 && nx < width && ny >= start_row && ny < end_row) {
                 int n_global_idx = ny * width + nx;

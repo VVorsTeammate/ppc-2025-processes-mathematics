@@ -10,22 +10,23 @@ namespace moskaev_v_binary_image_wrapper {
 
 namespace {
 
-const int DIRECTIONS[8][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
+const std::array<std::array<int, 2>, 8> kDirections = {
+    {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}}};
 
 int cross(const Point &O, const Point &A, const Point &B) {
   return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
 }
 
-std::vector<Point> findConnectedComponent(const std::vector<int> &image, int width, int height, int startX, int startY,
-                                          std::vector<bool> &visited) {
+std::vector<Point> FindConnectedComponent(const std::vector<int> &image, int width, int height, int start_x,
+                                          int start_y, std::vector<bool> &visited) {
   std::vector<Point> component;
-  if (image[startY * width + startX] != 1) {
+  if (image[(start_y * width) + start_x] != 1) {
     return component;
   }
 
   std::queue<Point> queue;
-  queue.push(Point(startX, startY));
-  visited[startY * width + startX] = true;
+  queue.emplace(start_x, start_y);
+  visited[start_y * width + start_x] = true;
 
   while (!queue.empty()) {
     Point current = queue.front();
@@ -33,8 +34,8 @@ std::vector<Point> findConnectedComponent(const std::vector<int> &image, int wid
     component.push_back(current);
 
     for (int i = 0; i < 8; ++i) {
-      int nx = current.x + DIRECTIONS[i][0];
-      int ny = current.y + DIRECTIONS[i][1];
+      int nx = current.x + kDirections[i][0];
+      int ny = current.y + kDirections[i][1];
 
       if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
         int index = ny * width + nx;
@@ -118,7 +119,7 @@ std::vector<std::vector<Point>> findAllComponents(const std::vector<int> &image,
       int index = y * width + x;
 
       if (image[index] == 1 && !visited[index]) {
-        std::vector<Point> component = findConnectedComponent(image, width, height, x, y, visited);
+        std::vector<Point> component = FindConnectedComponent(image, width, height, x, y, visited);
 
         if (component.size() >= 3) {
           components.push_back(std::move(component));

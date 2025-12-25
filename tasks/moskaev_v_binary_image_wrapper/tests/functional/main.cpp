@@ -2,7 +2,8 @@
 #include <gtest/gtest.h>
 #include <mpi.h>
 
-#include <iostream>
+#include <array>
+#include <string>
 #include <tuple>
 #include <vector>
 

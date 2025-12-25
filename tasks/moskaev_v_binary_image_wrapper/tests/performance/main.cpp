@@ -19,7 +19,7 @@ namespace moskaev_v_binary_image_wrapper {
 namespace {  // Анонимный namespace для вспомогательных функций
 
 // Генерация тестового изображения
-static void GenerateTestImage(InType &input_data, int width, int height, int seed = 42) {
+void GenerateTestImage(InType &input_data, int width, int height, int seed = 42) {
   input_data.clear();
   input_data.push_back(width);
   input_data.push_back(height);
@@ -33,17 +33,17 @@ static void GenerateTestImage(InType &input_data, int width, int height, int see
 
   // Добавляем несколько больших объектов
   for (int obj = 0; obj < 5; ++obj) {
-    int centerX = (obj * width / 6) + width / 12;
-    int centerY = (obj * height / 6) + height / 12;
-    int size = 20 + obj * 10;
+    int center_x = (obj * width / 6) + width / 12;
+    int center_y = (obj * height / 6) + height / 12;
+    int size = 20 + (obj * 10);
 
     // Квадрат
     for (int dx = -size; dx <= size; ++dx) {
       for (int dy = -size; dy <= size; ++dy) {
-        int x = centerX + dx;
-        int y = centerY + dy;
+        int x = center_x + dx;
+        int y = center_y + dy;
         if (x >= 0 && x < width && y >= 0 && y < height) {
-          image[y * width + x] = 1;
+          image[(y * width) + x] = 1;
         }
       }
     }
@@ -53,7 +53,7 @@ static void GenerateTestImage(InType &input_data, int width, int height, int see
   for (int i = 0; i < width * height / 100; ++i) {
     int x = gen() % width;
     int y = gen() % height;
-    image[y * width + x] = 1;
+    image[(y * width) + x] = 1;
   }
 
   // Копируем в input_data
@@ -133,7 +133,7 @@ TEST(MoskaevVSeqMinimal, TimeMeasurement) {
 
   std::chrono::duration<double> elapsed = end - start;
 
-  std::cout << elapsed.count() << std::endl;
+  std::cout << elapsed.count() << '\n';
 }
 
 }  // namespace moskaev_v_binary_image_wrapper
