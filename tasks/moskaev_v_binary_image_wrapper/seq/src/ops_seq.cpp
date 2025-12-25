@@ -4,10 +4,11 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <iterator>  // Добавлено для std::move
 #include <queue>
+#include <ranges>   // Добавлено для ranges алгоритмов
+#include <utility>  // Добавлено для std::pair
 #include <vector>
-
-#include "moskaev_v_binary_image_wrapper/common/include/common.hpp"
 
 namespace moskaev_v_binary_image_wrapper {
 
@@ -36,15 +37,16 @@ std::vector<Point> FindConnectedComponent(const std::vector<int> &image, int wid
     queue.pop();
     component.push_back(current);
 
-    for (int i = 0; i < 8; ++i) {
-      int nx = current.x + kDirections[i][0];
-      int ny = current.y + kDirections[i][1];
+    // Используем структурированные привязки вместо индексации
+    for (const auto &dir : kDirections) {
+      int nx = current.x + dir[0];
+      int ny = current.y + dir[1];
 
       if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
         int index = (ny * width) + nx;
         if (!visited[index] && image[index] == 1) {
           visited[index] = true;
-          queue.emplace(Point(nx, ny));
+          queue.emplace(nx, ny);
         }
       }
     }
@@ -80,12 +82,11 @@ std::vector<Point> GrahamScan(std::vector<Point> points) {
 
   Point pivot = FindPivotPoint(points);
 
-  auto it = std::remove_if(points.begin(), points.end(),
-                           [&pivot](const Point &p) { return p.x == pivot.x && p.y == pivot.y; });
-  points.erase(it, points.end());
+  // Используем ranges версию
+  std::erase_if(points, [&pivot](const Point &p) { return p.x == pivot.x && p.y == pivot.y; });
 
-  std::sort(points.begin(), points.end(),
-            [&pivot](const Point &a, const Point &b) { return PolarCompare(pivot, a, b); });
+  // Используем ranges версию
+  std::ranges::sort(points, [&pivot](const Point &a, const Point &b) { return PolarCompare(pivot, a, b); });
 
   std::vector<Point> hull;
   hull.push_back(pivot);
@@ -115,11 +116,12 @@ std::vector<Point> GrahamScan(std::vector<Point> points) {
 
 std::vector<std::vector<Point>> FindAllComponents(const std::vector<int> &image, int width, int height) {
   std::vector<std::vector<Point>> components;
-  std::vector<bool> visited(width * height, false);
+  const std::size_t total_size = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+  std::vector<bool> visited(total_size, false);
 
   for (int yy = 0; yy < height; ++yy) {
     for (int xx = 0; xx < width; ++xx) {
-      int index = yy * width + xx;
+      int index = (yy * width) + xx;
 
       if (image[index] == 1 && !visited[index]) {
         std::vector<Point> component = FindConnectedComponent(image, width, height, xx, yy, visited);
