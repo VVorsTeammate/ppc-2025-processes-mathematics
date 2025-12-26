@@ -24,7 +24,7 @@ int Cross(const Point &o, const Point &a, const Point &b) {
 std::vector<Point> FindConnectedComponent(const std::vector<int> &image, int width, int height, int start_x,
                                           int start_y, std::vector<bool> &visited) {
   std::vector<Point> component;
-  size_t start_index = static_cast<size_t>(start_y) * static_cast<size_t>(width) + static_cast<size_t>(start_x);
+  size_t start_index = (static_cast<size_t>(start_y) * static_cast<size_t>(width)) + static_cast<size_t>(start_x);
   if (image[start_index] != 1) {
     return component;
   }
@@ -43,7 +43,7 @@ std::vector<Point> FindConnectedComponent(const std::vector<int> &image, int wid
       int ny = current.y + dir[1];
 
       if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-        size_t index = static_cast<size_t>(ny) * static_cast<size_t>(width) + static_cast<size_t>(nx);
+        size_t index = (static_cast<size_t>(ny) * static_cast<size_t>(width)) + static_cast<size_t>(nx);
         if (!visited[index] && image[index] == 1) {
           visited[index] = true;
           queue.emplace(nx, ny);
@@ -86,12 +86,8 @@ std::vector<Point> GrahamScan(std::vector<Point> points) {
 
   Point pivot = FindPivotPoint(points);
 
-  points.erase(std::remove_if(points.begin(), points.end(),
-                              [&pivot](const Point &p) { return p.x == pivot.x && p.y == pivot.y; }),
-               points.end());
-
-  std::sort(points.begin(), points.end(),
-            [&pivot](const Point &a, const Point &b) { return PolarCompare(pivot, a, b); });
+  std::erase_if(points, [&pivot](const Point &p) { return p.x == pivot.x && p.y == pivot.y; });
+  std::ranges::sort(points, [&pivot](const Point &a, const Point &b) { return PolarCompare(pivot, a, b); });
 
   std::vector<Point> hull;
   hull.push_back(pivot);
@@ -128,7 +124,7 @@ std::vector<std::vector<Point>> FindAllComponents(const std::vector<int> &image,
 
   for (int yy = 0; yy < height; ++yy) {
     for (int xx = 0; xx < width; ++xx) {
-      size_t index = static_cast<size_t>(yy) * static_cast<size_t>(width) + static_cast<size_t>(xx);
+      size_t index = (static_cast<size_t>(yy) * static_cast<size_t>(width)) + static_cast<size_t>(xx);
 
       if (image[index] == 1 && !visited[index]) {
         std::vector<Point> component = FindConnectedComponent(image, width, height, xx, yy, visited);

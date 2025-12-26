@@ -106,16 +106,13 @@ std::vector<Point> GrahamScan(std::vector<Point> points) {
 
   Point pivot = FindPivot(points);
 
-  points.erase(std::remove_if(points.begin(), points.end(),
-                              [&pivot](const Point &p) { return p.x == pivot.x && p.y == pivot.y; }),
-               points.end());
+  std::erase_if(points, [&pivot](const Point &p) { return p.x == pivot.x && p.y == pivot.y; });
 
   if (points.empty()) {
     return {pivot};
   }
 
-  std::sort(points.begin(), points.end(),
-            [&pivot](const Point &a, const Point &b) { return PolarCompare(pivot, a, b); });
+  std::ranges::sort(points, [&pivot](const Point &a, const Point &b) { return PolarCompare(pivot, a, b); });
 
   std::vector<Point> hull;
   hull.push_back(pivot);
@@ -268,7 +265,7 @@ void SendComponentsToRoot(const std::vector<std::vector<Point>> &local_component
 
       for (int i = 0; i < comp_size; ++i) {
         buffer[static_cast<size_t>(i) * 2] = comp[static_cast<size_t>(i)].x;
-        buffer[static_cast<size_t>(i) * 2 + 1] = comp[static_cast<size_t>(i)].y;
+        buffer[(static_cast<size_t>(i) * 2) + 1] = comp[static_cast<size_t>(i)].y;
       }
 
       MPI_Send(buffer.data(), comp_size * 2, MPI_INT, 0, 0, MPI_COMM_WORLD);
